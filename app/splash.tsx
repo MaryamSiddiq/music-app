@@ -1,18 +1,37 @@
+// screens/SplashScreen.tsx
 import { AppText } from '@/components/AppText';
 import { colors } from '@/src/theme/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
 export default function SplashScreen() {
- useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/signup'); // move to signup
-    }, 2500); // 2.5 seconds
+  useEffect(() => {
+    const checkAuthAndNavigate = async () => {
+      try {
+        // Check if token exists in AsyncStorage
+        const userToken = await AsyncStorage.getItem('userToken');
+        
+        // Wait for 2.5 seconds total (splash screen duration)
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        
+        if (userToken) {
+          console.log('Token found, navigating to home');
+          router.replace('/(tabs)'); // Navigate to main app
+        } else {
+          console.log(' No token found, navigating to signup');
+          router.replace('/signup'); // Navigate to signup
+        }
+      } catch (error) {
+        console.error('Error checking token:', error);
+        // On error, go to signup
+        router.replace('/signup');
+      }
+    };
 
-    return () => clearTimeout(timer);
+    checkAuthAndNavigate();
   }, []);
-
 
   return (
     <View style={styles.container}>
@@ -26,7 +45,6 @@ export default function SplashScreen() {
       <AppText variant="title" style={styles.title}>
         Start Tuning Your ideas into Reality
       </AppText>
-
 
       <AppText variant="subtitle" style={styles.subtitle}>
         Listen to Vii Music

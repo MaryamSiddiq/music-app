@@ -72,8 +72,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon 
               focused={focused} 
-              iconName="download" 
-              iconNameOutline="arrow-down" 
+              iconName="time" 
+              iconNameOutline="time-outline" 
               color={color}
             />
           ),

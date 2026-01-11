@@ -1,11 +1,14 @@
+// HomeScreen.tsx
 import { AppText } from '@/components/AppText';
-import { SectionHeader } from '@/components/SectionHeader'; // Your existing component
-import { recentPlays } from '@/src/data/recentPlays';
+import { SectionHeader } from '@/components/SectionHeader';
+import * as API from '@/src/services/api';
 import { colors } from '@/src/theme/colors';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -14,34 +17,194 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SearchBar } from 'react-native-screens';
+
+interface PartyCard {
+  id: number;
+  title: string;
+  subtitle: string;
+  image: any;
+}
 
 export default function HomeScreen() {
-  const [activeTab, setActiveTab] = useState('Recommendation');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('Recommendation');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<API.Song[]>([]);
+  const [recentSongs, setRecentSongs] = useState<API.Song[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>('');
 
-  const tabs = ['Recommendation', 'Trending', 'Beauty', 'Business'];
+  const tabs: string[] = ['Recommendation', 'Trending', 'Beauty', 'Business'];
 
-  const partyCards = [
+  const partyCards: PartyCard[] = [
     { id: 1, title: 'Friday Party', subtitle: 'Party mood !', image: require('@/assets/images/party-card1.png') },
     { id: 2, title: 'Saturday Party', subtitle: 'Party mood !', image: require('@/assets/images/party-card2.png') },
   ];
 
-  const filteredRecentPlays = recentPlays.filter(item => 
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  // Fetch username and recent songs on component mount
+  useEffect(() => {
+    fetchUsername();
+    fetchRecentSongs();
+  }, []);
+
+  // Fetch songs based on active tab
+  useEffect(() => {
+    if (activeTab === 'Recommendation') {
+      fetchRecommendations();
+    } else if (activeTab === 'Trending') {
+      fetchTrendingSongs();
+    }
+    else if (activeTab === 'Beauty') {
+      fetchRecommendations();
+    }
+    else if (activeTab === 'Business') {
+      fetchTrendingSongs();
+    }
+  }, [activeTab]);
+
+  // Handle search with debouncing
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchQuery.trim().length > 0) {
+        performSearch();
+      } else {
+        setShowSearchResults(false);
+        // Restore the original songs based on tab
+        if (activeTab === 'Recommendation') {
+          fetchRecommendations();
+        } else if (activeTab === 'Trending') {
+          fetchTrendingSongs();
+        } else {
+          fetchRecentSongs();
+        }
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // Fetch username from AsyncStorage
+  const fetchUsername = async (): Promise<void> => {
+    try {
+      const userDataString = await AsyncStorage.getItem('userData');
+      if (userDataString) {
+        const userData = JSON.parse(userDataString);
+        setUsername(userData.name || userData.username || '');
+      }
+    } catch (error) {
+      console.error('Error fetching username:', error);
+    }
+  };
+
+  const fetchRecentSongs = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const songs = await API.getRecentSongs();
+      setRecentSongs(songs);
+    } catch (error) {
+      console.error('Error fetching recent songs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRecommendations = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const songs = await API.getRecommendations();
+      setRecentSongs(songs);
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTrendingSongs = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const songs = await API.getTrendingSongs();
+      setRecentSongs(songs);
+    } catch (error) {
+      console.error('Error fetching trending songs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performSearch = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const results = await API.searchSongs(searchQuery);
+      setSearchResults(results);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSongPress = async (song: API.Song): Promise<void> => {
+    try {
+      // Navigate to playing screen with song data
+      router.push({
+        pathname: '/playingsong' as any,
+        params: { 
+          id: song.id,
+          title: song.title,
+          artist: song.artist,
+          thumbnail: song.thumbnail,
+          duration: song.duration || '0:00'
+        }
+      });
+    } catch (error) {
+      console.error('Error handling song press:', error);
+    }
+  };
+
+  const renderSongItem = (item: API.Song) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.recentItem}
+      activeOpacity={0.8}
+      onPress={() => handleSongPress(item)}
+    >
+      <Image 
+        source={{ uri: item.thumbnail }} 
+        style={styles.recentImage}
+      />
+
+      <View style={{ flex: 1 }}>
+        <AppText variant="body" style={styles.recenttext}>{item.title}</AppText>
+        <AppText variant="caption" style={styles.recenttext}>{item.artist}</AppText>
+        <AppText variant="caption" style={styles.time}>{item.duration || '0:00'}</AppText>
+      </View>
+
+      <View style={styles.playCircle}>
+        <MaterialIcons name="play-arrow" size={18} color="#fff" />
+      </View>
+    </TouchableOpacity>
   );
+
+  // Format greeting with username or default
+  const getGreeting = () => {
+    if (username) {
+      return `Hello ${username},`;
+    }
+    return 'Hello,';
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <AppText variant="body" style={styles.ptext}>Hello Vini,</AppText>
+        <AppText variant="body" style={styles.ptext}>{getGreeting()}</AppText>
         <AppText variant="caption" style={styles.ptext}>
           What You want to hear today ?
         </AppText>
       </View>
-<SearchBar/>
+      
       {/* Search */}
       <View style={styles.searchContainer}>
         <MaterialIcons name="search" size={20} color={colors.text.tertiary} />
@@ -50,9 +213,13 @@ export default function HomeScreen() {
           placeholder="Search"
           placeholderTextColor={colors.text.tertiary}
           value={searchQuery}
-          onChangeText={text => setSearchQuery(text)}
+          onChangeText={(text: string) => setSearchQuery(text)}
         />
-        <MaterialIcons name="keyboard-voice" size={20} color={colors.text.tertiary} />
+        {loading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <MaterialIcons name="keyboard-voice" size={20} color={colors.text.tertiary} />
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -63,7 +230,10 @@ export default function HomeScreen() {
             return (
               <TouchableOpacity
                 key={tab}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => {
+                  setActiveTab(tab);
+                  setShowSearchResults(false);
+                }}
                 style={styles.tabItem}
                 activeOpacity={0.8}
               >
@@ -81,9 +251,9 @@ export default function HomeScreen() {
             );
           })}
         </View>
-        
+
         {/* Party Cards */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.partyCardsContainer}>
           {partyCards.map(card => (
             <View key={card.id} style={styles.partyCard}>
               <Image source={card.image} style={styles.partyImage} />
@@ -100,38 +270,44 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
-        {/* Recently Played - USING YOUR SECTIONHEADER */}
-        <SectionHeader 
-          title="Recently Play"
-          actionText="See all"
-        />
-
-        {/* Recently Played List */}
-        {filteredRecentPlays.map(item => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.recentItem}
-            activeOpacity={0.8}
-            onPress={() =>
-              router.push({
-                pathname: '/playingsong',
-                params: { id: item.id.toString() },
-              })
-            }
-          >
-            <Image source={item.image} style={styles.recentImage} />
-
-            <View style={{ flex: 1 }}>
-              <AppText variant="body" style={styles.recenttext}>{item.title}</AppText>
-              <AppText variant="caption" style={styles.recenttext}>{item.artist}</AppText>
-              <AppText variant="caption" style={styles.time}>{item.time}</AppText>
-            </View>
-
-            <View style={styles.playCircle}>
-              <MaterialIcons name="play-arrow" size={18} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        ))}
+        {/* Search Results or Recently Played */}
+        {showSearchResults ? (
+          <>
+            <SectionHeader
+              title="Search Results"
+              actionText="Clear"
+              onActionPress={() => {
+                setSearchQuery('');
+                setShowSearchResults(false);
+              }}
+            />
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+            ) : searchResults.length > 0 ? (
+              searchResults.map(renderSongItem)
+            ) : (
+              <AppText variant="body" style={styles.noResults}>
+                No songs found
+              </AppText>
+            )}
+          </>
+        ) : (
+          <>
+            <SectionHeader
+              title={activeTab === 'Recommendation' ? 'Recommended' : 'Recently Played'}
+              actionText="See all"
+            />
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+            ) : recentSongs.length > 0 ? (
+              recentSongs.map(renderSongItem)
+            ) : (
+              <AppText variant="body" style={styles.noResults}>
+                No songs available
+              </AppText>
+            )}
+          </>
+        )}
 
         <View style={{ height: 90 }} />
       </ScrollView>
@@ -139,7 +315,6 @@ export default function HomeScreen() {
   );
 }
 
-// Styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -151,7 +326,6 @@ const styles = StyleSheet.create({
   ptext: {
     color: colors.text.primary,
   },
-
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,36 +342,32 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     marginHorizontal: 6,
   },
-
   tabs: {
-  flexDirection: 'row',
-  paddingHorizontal: 20,
-  marginBottom: 16,
-},
-
-tabItem: {
-  marginRight: 22,
-  alignItems: 'center',
-},
-
-tabText: {
-  color: colors.text.tertiary,
-},
-
-activeTabText: {
-  color: colors.primary,
-  fontWeight: '500',
-},
-
-tabUnderline: {
-  marginTop: 4,          
-  height: 2,
-  width: '60%',         // underline exactly text width
-  backgroundColor: colors.primary,
-  borderRadius: 2,
-},
-
-
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  tabItem: {
+    marginRight: 22,
+    alignItems: 'center',
+  },
+  tabText: {
+    color: colors.text.tertiary,
+  },
+  activeTabText: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  tabUnderline: {
+    marginTop: 4,
+    height: 2,
+    width: '60%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+  },
+  partyCardsContainer: {
+    marginBottom: 20,
+  },
   partyCard: {
     width: 150,
     height: 160,
@@ -226,29 +396,18 @@ tabUnderline: {
     left: 12,
   },
   partyTitle: {
-    color:colors.text.primary,
+    color: colors.text.primary,
   },
-  subtitle:{
- color:colors.text.primary,
-
-  }
-,
-  recentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginVertical: 16,
+  subtitle: {
+    color: colors.text.primary,
   },
-recenttext:{
-  color:colors.text.primary,
-},
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 14,
-    marginLeft:20,
-    marginRight:20,
+    marginLeft: 20,
+    marginRight: 20,
     backgroundColor: '#4E4E54',
     borderRadius: 10,
     padding: 10,
@@ -258,11 +417,14 @@ recenttext:{
     height: 50,
     borderRadius: 8,
     marginRight: 12,
+    backgroundColor: '#3A3A3A',
+  },
+  recenttext: {
+    color: colors.text.primary,
   },
   time: {
     marginTop: 2,
-      color:colors.text.primary,
-
+    color: colors.text.primary,
   },
   playCircle: {
     backgroundColor: colors.primary,
@@ -272,5 +434,13 @@ recenttext:{
     alignItems: 'center',
     justifyContent: 'center',
   },
+  loader: {
+    marginTop: 20,
+  },
+  noResults: {
+    textAlign: 'center',
+    color: colors.text.secondary,
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
 });
-
