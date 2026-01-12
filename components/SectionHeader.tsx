@@ -17,7 +17,7 @@ export const SectionHeader: React.FC<Props> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <AppText style={styles.title} variant="subtitle">{title}</AppText>
+      <AppText style={styles.title} variant="body">{title}</AppText>
       {actionText && (
         <TouchableOpacity onPress={onActionPress}>
           <AppText style={styles.action}>{actionText}</AppText>

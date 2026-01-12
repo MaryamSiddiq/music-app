@@ -413,10 +413,11 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   recentImage: {
-    width: 50,
-    height: 50,
+    width: 60,
+    height: 70,
     borderRadius: 8,
     marginRight: 12,
+    marginLeft:-10,
     backgroundColor: '#3A3A3A',
   },
   recenttext: {

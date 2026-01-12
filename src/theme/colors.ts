@@ -5,7 +5,7 @@ export const colors = {
   primary: '#24CEF0',        // Your main cyan/blue
   primaryDark: '#1BA5C9',    // Darker shade for press states
   primaryLight: '#5DD9F3',   // Lighter shade for highlights
-  
+  tabcolor:'#343435',
   // Secondary/Gray
   secondary: '#8E8E8E',      // Your gray color
   

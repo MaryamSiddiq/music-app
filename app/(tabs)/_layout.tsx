@@ -1,5 +1,4 @@
 import { TabBarIcon } from '@/components/TabBarIcon';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors } from '@/src/theme/colors';
 import { Tabs } from 'expo-router';
@@ -15,7 +14,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
+          backgroundColor: colors.tabcolor,
           borderTopWidth: 1,
           height: 60 + insets.bottom,
           paddingBottom: insets.bottom,
